@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DHPlayer-工程化简易demo</title>
+    <!-- <link rel="stylesheet" href="./panTilt/panTilt.css"> -->
+    <style>
+        body {
+            font-size: 12px;
+        }
+        .tishi {
+            color: gray; font-size: 12px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- 登录信息 -->
+    <span style="font-size: 20px;">登录模式需要登录平台，因此创建播放器时需要1-3s的时间创建并登录插件，请耐心等待！</span>
+    <div style="margin: 20px;">
+        <input id="player-type" type="text" value="0"> <span class="tishi">输入0-实时预览  3-录像回放  7-录像回放(支持倒放)</span> <br><br>
+        icc的ip：<input id="ip" type="text" placeholder="124.160.33.135" value="124.160.33.135">
+        icc的port：<input id="port" type="text" placeholder="4077" value="4077">
+        登录账号：<input id="name" type="text" placeholder="TEST" value="TEST">
+        登录密码：<input id="pwd" type="password" placeholder="Admin123" value="Admin123">
+        <button id="" onclick="initDHPlayer()">初始化并登录插件</button>
+        <div id="desc">请初始化插件....</div>
+    </div>
+
+    <div style="display: flex;">
+        <div id="dhplayer-dom" style="width: 700px; height: 500px; border: 1px solid #000"></div>
+        <div style="flex: 1; margin-left: 20px;">
+            <div>
+                <p class="tishi">通道id规则说明： 1000131(设备编码) + $1$0$(拼接字符串(固定)) + 0(通道编码) <br>可在ICC平台设备管理页面查看到通道id</p>
+                通道id: <input id="channelId" type="text" placeholder="1000131$1$0$0" value="1000131$1$0$0"><button id="real">播放视频</button><br>
+                <br><hr><br>
+                录像回放请选择以下内容：<br>
+                <select id="recordSource" style="margin: 20px 0;">
+                    <option value="2">设备录像(存储在设备上的)</option>
+                    <option value="3">中心录像(存储在服务器上的)
+                        </option>
+                </select><br>
+                时间：<input id="date" type="date"><span class="tishi">支持跨天，此处demo只展示查询一天的逻辑，具体见代码</span>
+            </div>
+            <br><hr><br>
+            <div>其他功能请查阅 <a href="https://open-icc.dahuatech.com/dhplayer/">开放平台-dhplayer对外文档-API</a></div>
+            <div>参数请详见demo.html和上述文档</a></div>
+        </div>
+    </div>
+    
+    
+    <script src="./videoPlayer.js"></script>
+    <script>
+        let videoPlayer = null
+
+        // 初始化并登录插件
+        function initDHPlayer() {
+            document.querySelector("#desc").innerHTML= "正在登录中...请等待登录完成再进行视频播放"
+            videoPlayer = new VideoPlayer({
+                videoId: "dhplayer-dom", // 唯一标识，必填，不能重复
+                windowType: document.querySelector("#player-type").value - 0, // 播放器类型，必传， 0 - 实时预览，3 - 录像回放，7- 录像回放（支持倒放）
+                usePluginLogin: true, // 采用登录 (请默认传true，插件内部自动拉流)
+                pluginLoginInfo: { // 传入 icc 平台的登录信息
+                    host: document.querySelector('#ip').value, // icc 平台ip
+                    port: document.querySelector('#port').value, // icc 平台端口 https 默认 443
+                    username: document.querySelector('#name').value, // icc 平台用户名
+                    password: document.querySelector('#pwd').value, // icc 平台密码
+                },
+                division: 1, // 默认展示的窗口数量， 必传
+                draggable: false, // 窗口拖拽 【暂不支持】
+                showBar: true, // 底部操作栏， 选传，【true - 显示, false - 隐藏】
+                shieldClass: [], // 如果DOM元素被插件挡住了，把DOM元素的类名传入。
+                coverShieldClass: [], // 如果插件要在dom内滚动，需要把DOM元素的类名传入，请查看案例-遮挡
+                parentIframeShieldClass: [], // 有 iframe 时，top层 的 dom 元素被插件挡住了，把DOM元素的类名传入。
+                // 下面均为回调函数，请按需使用，具体可在 API 内进行功能的体验和查看。
+
+                // 创建播放器成功回调
+                createSuccess: (versionInfo) => {
+                    // 该回调触发后，我们可以进行实时预览/录像回放等操作
+                    document.querySelector("#desc").innerHTML= "创建成功!!!" + versionInfo.message
+                },
+                // 创建播放器失败回调
+                createError: (err) => {
+                    // 有错误码，可打印查看错误信息
+                    document.querySelector("#desc").innerHTML= "创建失败!!!" + JSON.stringify(err)
+                },
+                // 插件公共回调
+                dhPlayerMessage: (info, err) => { },
+                // 实时预览成功回调
+                realSuccess: (info) => { },
+                // 实时预览失败回调
+                realError: (info, err) => { },
+                // 对讲成功回调
+                talkSuccess: (info) => { },
+                // 对讲失败回调
+                talkError: (info, err) => { },
+                // 录像播放成功回调
+                playbackSuccess: (info) => { },
+                // 录像播放失败回调
+                playbackError: (info, err) => { },
+                // 录像播放完成回调
+                playbackFinish: (info) => { },
+                // 抓图成功回调
+                snapshotSuccess: ({ base64Url, path }, info) => {
+                    var byteCharacters = atob(
+                        base64Url.replace(/^data:image\/(png|jpeg|jpg);base64,/, "")
+                    );
+                    var byteNumbers = new Array(byteCharacters.length);
+                    for (var i = 0; i < byteCharacters.length; i++) {
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }
+                    var byteArray = new Uint8Array(byteNumbers);
+                    var blob = new Blob([byteArray], {
+                        type: undefined,
+                    });
+                    var aLink = document.createElement("a");
+                    aLink.download = "图片名称.jpg"; //这里写保存时的图片名称
+                    aLink.href = URL.createObjectURL(blob);
+                    aLink.click();
+                 },
+                // 本地录像下载成功回调
+                videoDownloadSuccess: (path, info) => {
+                    alert("本地录像地址：" + path)
+                },
+                // 关闭视频窗口回调
+                closeWindowSuccess: ({ isAll, snum, channelList }) => { },
+                // 鼠标单击窗口回调
+                clickWindow: (snum) => { },
+                // 鼠标双击窗口回调
+                dbClickWindow: (snum) => { },
+                // 播放器窗口的数量回调
+                changeDivision: (division) => { },
+                // rtsp 流下载录像成功回调
+                downloadRecordSuccess: (info) => { },
+                // rtsp 流下载录像失败回调
+                downloadRecordError: (info, err) => { }
+            })
+
+        }
+
+        // 播放实时预览
+        document.getElementById("real").onclick = function () {
+            console.log(document.querySelector('#player-type').value == '0')
+            document.querySelector('#player-type').value == '0' ? startReal() : startPlayback()
+        }
+        
+        // 实时预览
+        function startReal() {
+            if(!videoPlayer) {
+                document.querySelector("#desc").innerHTML= "不能播放，请先初始化插件！！！！！"
+                return
+            }
+            videoPlayer.startReal([{
+                channelId: document.querySelector('#channelId').value, // 通道id 【必传】
+                channelName: '通道名称', // 通道名称 (用于本地录像下载)
+                snum: 0, // 即将要播放的窗口序号，从0开始 【必传】
+                streamType: 1,  // 1-主码流  2-辅码流 (可不传，默认主码流)
+                deviceType: 5, // 设备类别 (用于对讲使用) 
+                cameraType: '1',  // 摄像头类型 (用于云台)
+                capability: '00000000000000000000000000000001', // 能力集 (用于云台)
+            }])
+        }
+
+
+        // 录像回放
+        function startPlayback() {
+            let date = document.querySelector('#date').value;
+            console.log(date)
+            videoPlayer.startPlayback(
+                [{
+                    channelId: document.querySelector('#channelId').value, // 通道id
+                    channelName: '通道名称', // 通道名称 (用于本地录像下载和错误提示)
+                    startTime: date + ' 00:00:00', // 开始时间
+                    endTime: date +' 23:59:59', // 结束时间
+                    recordSource: document.querySelector('#channelId').value || 3, // 2-录像 3-中心
+                    streamType: 0, // 0-所有码流 1-主码流  2-辅码流
+                    snum: 0 //  播放的窗口序号 (从0开始计数，表示第一个窗口)
+                }]
+            )
+        }
+
+        // 控制插件的显示，两种方式均试用
+        function showDHPlayer() {
+            // 1. 
+            videoPlayer._update({
+                visible: true
+            })
+            // 2. 
+            videoPlayer.show()
+        }
+
+        // 控制插件的隐藏，两种方式均试用
+        function hideDHPlayer() {
+            // 1. 
+            videoPlayer._update({
+                visible: false
+            })
+            // 2. 
+            videoPlayer.hide()
+        }
+    </script>
+    </script>
+</body>
+
+</html>
